@@ -13,6 +13,8 @@ MIRRORED_EVENTS = [
 
 MIRRORED_FUNCTIONS = [
    'say',
+   'action',
+   'notice',
 ];
 
 DEFAULT_CONFIG = {
