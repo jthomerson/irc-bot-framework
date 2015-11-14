@@ -1,11 +1,12 @@
 var _ = require('underscore'),
-    Class = require('class.extend'),
+    Pluggable = require('./Pluggable'),
     irc = require('irc'),
     EventEmitter = require('events').EventEmitter,
     MIRRORED_EVENTS, MIRRORED_FUNCTIONS, DEFAULT_CONFIG, DEFAULT_CONN_CONFIG, MANDATORY_CONN_CONFIG,
     Client;
 
 MIRRORED_EVENTS = [
+   'raw',
    'nick',
    'join',
    'error',
@@ -13,6 +14,8 @@ MIRRORED_EVENTS = [
 
 MIRRORED_FUNCTIONS = [
    'say',
+   'join',
+   'send',
    'action',
    'notice',
 ];
@@ -33,9 +36,7 @@ MANDATORY_CONN_CONFIG = {
    autoConnect: true
 };
 
-Client = Class.extend({
-
-   _nickIndex: 0,
+Client = Pluggable.extend({
 
    init: function(userConfig) {
       var config = _.extend({}, DEFAULT_CONFIG, userConfig),
@@ -46,13 +47,16 @@ Client = Class.extend({
       this._config.connection = conn;
       this._client = new irc.Client(conn.server, nick, conn);
 
-      // handle nick registration and room joining:
-      this._listenForNickRejections();
-      this._waitToJoin();
+      this.use(require('../plugins/core/rawMessageEmitter'));
+      this.use(require('../plugins/core/nickAndJoin'));
+      this.use(require('../plugins/core/messageMediator'));
 
-      this._listenForMessages();
       this._mirrorEvents();
       this._mirrorFunctions();
+   },
+
+   nick: function() {
+      return this._client.nick;
    },
 
    _mirrorEvents: function() {
@@ -69,49 +73,6 @@ Client = Class.extend({
          this[fn] = function() {
             this._client[fn].apply(this._client, Array.prototype.slice.call(arguments));
          }.bind(this);
-      }.bind(this));
-   },
-
-   _listenForNickRejections: function() {
-      this._client.on('raw', function(data) {
-         if (data.command === 'err_nicknameinuse') {
-            this._nickIndex++;
-            this._logger.debug('nick in use:', data.args);
-            if (this._config.nicknames.length > this._nickIndex) {
-               this._logger.debug('trying nickname [%s]: "%s"', this._nickIndex, this._config.nicknames[this._nickIndex]);
-               this._client.send('nick', this._config.nicknames[this._nickIndex]);
-            }
-         }
-      }.bind(this));
-   },
-
-   _waitToJoin: function() {
-      var isValidNick = _.contains(this._config.nicknames, this._client.nick),
-          hasNicksLeft = (this._config.nicknames.length > this._nickIndex),
-          channels = this._config.channels.join(' ');
-
-      if (!isValidNick && hasNicksLeft) {
-         // will still be trying, so don't join yet
-         return setTimeout(this._waitToJoin.bind(this), 100);
-      }
-
-      this._logger.debug('joining channels [%s] as "%s"', channels, this._client.nick);
-      this._client.join(channels);
-   },
-
-   _listenForMessages: function() {
-      this._client.on('message', function(sender, channel, msg, data) {
-         var ind = msg.indexOf(this._client.nick),
-             isPrivateChannel = (channel === this._client.nick),
-             responseChannel = (isPrivateChannel ? sender : channel);
-
-         this._logger.trace('received message from "%s" on "%s" saying "%s"', sender, channel, msg);
-
-         if (ind === 0 || isPrivateChannel) {
-            this.emit('directmessage', sender, responseChannel, msg, data);
-         } else if (ind !== -1) {
-            this.emit('mention', sender, responseChannel, msg, data);
-         }
       }.bind(this));
    },
 
