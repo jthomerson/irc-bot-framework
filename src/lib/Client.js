@@ -76,7 +76,9 @@ Client = Class.extend({
       this._client.on('raw', function(data) {
          if (data.command === 'err_nicknameinuse') {
             this._nickIndex++;
+            this._logger.debug('nick in use:', data.args);
             if (this._config.nicknames.length > this._nickIndex) {
+               this._logger.debug('trying nickname [%s]: "%s"', this._nickIndex, this._config.nicknames[this._nickIndex]);
                this._client.send('nick', this._config.nicknames[this._nickIndex]);
             }
          }
@@ -93,6 +95,7 @@ Client = Class.extend({
          return setTimeout(this._waitToJoin.bind(this), 100);
       }
 
+      this._logger.debug('joining channels [%s] as "%s"', channels, this._client.nick);
       this._client.join(channels);
    },
 
@@ -101,6 +104,8 @@ Client = Class.extend({
          var ind = msg.indexOf(this._client.nick),
              isPrivateChannel = (channel === this._client.nick),
              responseChannel = (isPrivateChannel ? sender : channel);
+
+         this._logger.trace('received message from "%s" on "%s" saying "%s"', sender, channel, msg);
 
          if (ind === 0 || isPrivateChannel) {
             this.emit('directmessage', sender, responseChannel, msg, data);
