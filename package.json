@@ -1,6 +1,6 @@
 {
   "name": "irc-bot-framework",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Simple framework for making an IRC bot that uses pre-built or custom plugins to add functionality.",
   "main": "src/index.js",
   "scripts": {

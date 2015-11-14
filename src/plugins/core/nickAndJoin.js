@@ -33,6 +33,7 @@ module.exports = function(client, IBF) {
 
       IBF.logger.debug('joining channels [%s] as "%s"', channels, client.nick());
       client.join(channels);
+      client.emit('ready');
    }
 
    waitToJoin();
