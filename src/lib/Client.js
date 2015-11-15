@@ -1,4 +1,5 @@
 var _ = require('underscore'),
+    Q = require('q'),
     Pluggable = require('./Pluggable'),
     irc = require('irc'),
     EventEmitter = require('events').EventEmitter,
@@ -57,6 +58,32 @@ Client = Pluggable.extend({
 
    nick: function() {
       return this._client.nick;
+   },
+
+   inRoom: function(room) {
+      var def = Q.defer(),
+          timeoutID;
+
+      this._logger.trace('querying for users in room "%s"', room);
+
+      this._client.once('names' + room, function(users) {
+         users = _.keys(users);
+         this._logger.trace('users in "%s":', room, users.join(', '));
+         def.resolve(users);
+         clearTimeout(timeoutID);
+      }.bind(this));
+
+      // if we have not fulfilled the promise in ten seconds, give up
+      timeoutID = setTimeout(function() {
+         if (!def.promise.isFulfilled()) {
+            this._logger.trace('waited too long for response for users in "%s"', room);
+            def.reject('timeout exceeded');
+         }
+      }.bind(this), 10000);
+
+      this._client.send('names', room);
+
+      return def.promise;
    },
 
    _mirrorEvents: function() {
